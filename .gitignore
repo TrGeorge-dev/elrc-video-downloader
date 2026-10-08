@@ -1,0 +1,41 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+runtime/
+build/
+dist/
+*.egg-info/
+
+# Downloaded media and transfer records
+*.mp4
+*.m4v
+*.mkv
+*.webm
+*.ts
+*.m3u8
+*.part
+*.part.json
+*.elrc.json
+*.zip
+downloads/
+
+# Local browser sessions, credentials and settings
+chrome-profile/
+browser-profile/
+elrc-state/
+ELRCVideoDownloader/
+cookies*
+*storage_state*.json
+settings.json
+app.lock
+.env
+.env.*
+*.log
+
+# Local investigation artifacts
+work/
+outputs/
+.DS_Store
+Thumbs.db
