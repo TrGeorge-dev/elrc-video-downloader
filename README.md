@@ -4,6 +4,8 @@
 
 适用于 Windows 10/11、Google Chrome 和 Python 3.10+（含 tkinter）。这是独立项目，与学校及 ELRC 平台无隶属关系。
 
+> **使用前请阅读 [使用声明与免责声明](DISCLAIMER.md)**：本项目为非官方工具；请确认你有权访问、保存和使用相关课程内容。能够播放不等于获得下载或传播授权，MIT 许可证仅适用于本项目代码。
+
 ## 使用
 
 1. 点击仓库的 **Code → Download ZIP**，解压到本机。
@@ -84,4 +86,4 @@ py -3 -m venv .venv
 
 ## 许可证
 
-代码采用 [MIT License](LICENSE)。
+代码采用 [MIT License](LICENSE)。[使用声明与免责声明](DISCLAIMER.md) 说明内容权限、隐私和责任范围，不修改 MIT 对软件代码授予的许可。
