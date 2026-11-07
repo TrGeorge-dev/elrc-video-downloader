@@ -1,12 +1,14 @@
 """ELRC MP4 streaming transfer; no credentials or source URLs are saved to disk."""
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import struct
+import sys
 import threading
 from typing import Callable
 from urllib.parse import urljoin, urlsplit
@@ -64,6 +66,25 @@ def _save(path: Path, data: dict) -> None:
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(temporary, path)
+
+
+def _publish(part: Path, target: Path) -> None:
+    try:
+        if sys.platform == "darwin":
+            # POSIX rename replaces a destination. RENAME_EXCL makes this atomic on macOS.
+            rename_exclusive = ctypes.CDLL(None, use_errno=True).renamex_np
+            rename_exclusive.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
+            rename_exclusive.restype = ctypes.c_int
+            rename_excl = 0x00000004  # <sys/stdio.h>
+            if rename_exclusive(os.fsencode(part), os.fsencode(target), rename_excl):
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error), target)
+        else:
+            if target.exists():
+                raise FileExistsError(target)
+            os.rename(part, target)
+    except FileExistsError:
+        raise DownloadError("保存位置出现同名文件；下载内容保存在 .part，未覆盖原文件。") from None
 
 
 def _validator(meta: dict) -> str | None:
@@ -129,9 +150,7 @@ def download_media(session: requests.Session, url: str, target: Path,
         if cancel.is_set():
             raise Cancelled("已取消，临时文件已保留。")
         checked = validate_mp4(part)
-        if target.exists():
-            raise DownloadError("保存位置出现同名文件，未覆盖原文件。")
-        os.rename(part, target)
+        _publish(part, target)
         _save(done_path, {**old, "byte_size": checked["byte_size"]})
         meta_path.unlink(missing_ok=True)
         progress(offset, offset)
@@ -208,10 +227,7 @@ def download_media(session: requests.Session, url: str, target: Path,
     if total is not None and written != total:
         raise DownloadError("视频长度不完整，临时文件已保留，请再次下载。")
     checked = validate_mp4(part)
-    if target.exists():
-        raise DownloadError("下载期间出现了同名文件；下载内容保存在 .part，未覆盖原文件。")
-    # On Windows rename is atomic and fails if a destination appeared meanwhile.
-    os.rename(part, target)
+    _publish(part, target)
     _save(done_path, {**meta, "byte_size": checked["byte_size"]})
     meta_path.unlink(missing_ok=True)
     log("下载完成，已校验文件长度和 MP4 文件结构。")

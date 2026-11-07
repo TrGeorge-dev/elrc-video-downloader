@@ -11,7 +11,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import parse_qsl, unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlsplit, urlunsplit
 
 import requests
 from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
@@ -19,7 +19,9 @@ from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
 from transfer import download_media, DownloadError, Cancelled
 
 SITE = 'elrc.shanghaitech.edu.cn'
-DEFAULT_STATE = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'ELRCVideoDownloader'
+STATE_PARENT = (Path.home() / 'Library' / 'Application Support' if sys.platform == 'darwin'
+                else Path(os.environ.get('LOCALAPPDATA', str(Path.home()))))
+DEFAULT_STATE = STATE_PARENT / 'ELRCVideoDownloader'
 
 
 def normalize_url(value: str) -> str:
@@ -32,7 +34,9 @@ def normalize_url(value: str) -> str:
             or p.port not in (None, 443)
             or not re.fullmatch(r'/learn/videoreview/[A-Za-z0-9_-]+/?', p.path)):
         raise ValueError('请粘贴 https://elrc.shanghaitech.edu.cn/learn/videoreview/ 开头的课程录像链接。')
-    return urlunsplit(('https', SITE, p.path.rstrip('/'), p.query, ''))
+    # The lesson URL also goes in the Referer header. Preserve existing escapes.
+    query = quote(p.query, safe="!$&'()*+,;=:@/?%")
+    return urlunsplit(('https', SITE, p.path.rstrip('/'), query, ''))
 
 
 def same_lesson(current: str, requested: str) -> bool:
@@ -257,8 +261,10 @@ def gui(state_dir: Path):
     style = ttk.Style(root)
     if 'vista' in style.theme_names():
         style.theme_use('vista')
-    style.configure('TLabel', font=('Microsoft YaHei UI', 10))
-    style.configure('TButton', font=('Microsoft YaHei UI', 10), padding=(12, 6))
+    font_family = 'PingFang SC' if sys.platform == 'darwin' else 'Microsoft YaHei UI'
+    entry_font = font_family if sys.platform == 'darwin' else 'Segoe UI'
+    style.configure('TLabel', font=(font_family, 10))
+    style.configure('TButton', font=(font_family, 10), padding=(12, 6))
     state_dir.mkdir(parents=True, exist_ok=True)
     # Hold an OS file lock for the entire GUI lifetime; a crash releases it automatically.
     lock_handle = (state_dir / 'app.lock').open('a+b')
@@ -296,10 +302,10 @@ def gui(state_dir: Path):
     choices = []
     box = ttk.Frame(root, padding=22)
     box.pack(fill='both', expand=True)
-    ttk.Label(box, text='ELRC 录像下载器', font=('Microsoft YaHei UI', 20, 'bold')).pack(anchor='w')
+    ttk.Label(box, text='ELRC 录像下载器', font=(font_family, 20, 'bold')).pack(anchor='w')
     ttk.Label(box, text='粘贴课程录像链接，选择画面与保存位置。').pack(anchor='w', pady=(4, 20))
     ttk.Label(box, text='课程录像链接').pack(anchor='w')
-    url_entry = ttk.Entry(box, textvariable=url_var, font=('Segoe UI', 10))
+    url_entry = ttk.Entry(box, textvariable=url_var, font=(entry_font, 10))
     url_entry.pack(fill='x', pady=(6, 12))
     ttk.Label(box, text='保存到').pack(anchor='w')
     dest_row = ttk.Frame(box)
@@ -316,7 +322,7 @@ def gui(state_dir: Path):
     browse.pack(side='left', padx=(8, 0))
     action_row = ttk.Frame(box)
     action_row.pack(fill='x', pady=(0, 16))
-    ttk.Label(box, textvariable=title_var, font=('Microsoft YaHei UI', 11, 'bold')).pack(anchor='w')
+    ttk.Label(box, textvariable=title_var, font=(font_family, 11, 'bold')).pack(anchor='w')
     selection_frame = ttk.LabelFrame(box, text='可下载画面 · 可以多选', padding=10)
     selection_frame.pack(fill='x', pady=(8, 12))
     placeholder = ttk.Label(selection_frame, text='解析后会显示各路画面、清晰度和时长。')
@@ -325,9 +331,9 @@ def gui(state_dir: Path):
     bar.pack(fill='x', pady=(4, 4))
     ttk.Label(box, textvariable=progress_var).pack(anchor='w')
     ttk.Label(box, textvariable=status_var, wraplength=760).pack(anchor='w', pady=(10, 6))
-    log_view = tk.Text(box, height=7, state='disabled', wrap='word', font=('Microsoft YaHei UI', 9), relief='solid', borderwidth=1)
+    log_view = tk.Text(box, height=7, state='disabled', wrap='word', font=(font_family, 9), relief='solid', borderwidth=1)
     log_view.pack(fill='both', expand=True, pady=(2, 6))
-    ttk.Label(box, text='首次或登录过期时，请在独立浏览器窗口中登录；完成后会自动继续。', foreground='#666666').pack(anchor='w')
+    ttk.Label(box, text='首次或登录过期时，请在独立浏览器窗口中登录；完成后会自动继续。').pack(anchor='w')
 
     def log(text):
         log_view.configure(state='normal')
@@ -450,6 +456,8 @@ def gui(state_dir: Path):
         status_var.set('正在结束下载并关闭浏览器…')
 
     root.protocol('WM_DELETE_WINDOW', close)
+    if sys.platform == 'darwin':
+        root.createcommand('tk::mac::Quit', close)
     root.after(150, poll)
     url_entry.focus_set()
     root.mainloop()
