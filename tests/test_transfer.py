@@ -3,13 +3,17 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import queue
 import struct
 import tempfile
 import threading
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import requests
 
+import elrc_downloader as app
 import transfer
 
 
@@ -122,6 +126,21 @@ class TransferTests(unittest.TestCase):
         self.assertNotIn("private", metadata)
         self.assertNotIn(self.url, "".join(self.logs))
 
+    def test_download_sends_an_encoded_referer_for_a_chinese_lesson_url(self):
+        lesson = f"https://{app.SITE}/learn/videoreview/fixture?week=8&weekDay="
+        worker = app.BrowserWorker(queue.Queue(), self.target.parent)
+        worker.source = app.normalize_url(lesson + "周五&marker=a%26b+z&blank=")
+        worker.context = SimpleNamespace(cookies=lambda urls: [])
+        worker.page = SimpleNamespace(evaluate=lambda expression: "ELRC test")
+        worker.videos = [app.Video(self.url, "屏幕画面", 1, 1920, 1080, self.target.name)]
+
+        with patch.object(app.requests, "Session", return_value=self.session):
+            worker.download([0], self.target.parent)
+
+        sent = self.server.state["requests"][0]
+        self.assertEqual(sent["Referer"], lesson + "%E5%91%A8%E4%BA%94&marker=a%26b+z&blank=")
+        self.assertEqual(self.target.read_bytes(), VIDEO)
+
     def test_resume_is_byte_exact(self):
         self.seed()
         self.download()
@@ -186,6 +205,14 @@ class TransferTests(unittest.TestCase):
             self.download()
         self.assertEqual(self.target.read_bytes(), b"existing")
         self.assertFalse(self.server.state["requests"])
+
+    def test_publish_preserves_a_destination_created_during_download(self):
+        part = self.seed(size=len(VIDEO))
+        self.target.write_bytes(b"existing")
+        with self.assertRaises(transfer.DownloadError):
+            transfer._publish(part, self.target)
+        self.assertEqual(self.target.read_bytes(), b"existing")
+        self.assertEqual(part.read_bytes(), VIDEO)
 
     def test_other_source_partial_is_preserved(self):
         part = self.seed()

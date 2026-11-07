@@ -2,19 +2,21 @@
 
 上海科技大学 ELRC 单节课程回放下载工具。粘贴回放链接，在 Chrome 中登录，自行选择画面和保存位置，将原始 MP4 保存到本机。
 
-适用于 Windows 10/11、Google Chrome 和 Python 3.10+（含 tkinter）。这是独立项目，与学校及 ELRC 平台无隶属关系。
+适用于 Windows 10/11 和 macOS，需要 Google Chrome。从源码运行需要 Python 3.10+（含 tkinter）。这是独立项目，与学校及 ELRC 平台无隶属关系。
 
 > **使用前请阅读 [使用声明与免责声明](DISCLAIMER.md)**：本项目为非官方工具；请确认你有权访问、保存和使用相关课程内容。能够播放不等于获得下载或传播授权，MIT 许可证仅适用于本项目代码。
 
 ## 使用
 
-1. 点击仓库的 **Code → Download ZIP**，解压到本机。
-2. 安装 [Python](https://www.python.org/downloads/windows/) 和 [Google Chrome](https://www.google.com/chrome/)。安装 Python 时保留 Tcl/Tk 支持，并启用 Python Launcher 或加入 PATH。
-3. 双击 **启动.cmd**。首次运行自动建立独立 Python 环境并安装依赖，需要联网。
-4. 从 ELRC 复制具体课次的回放链接，粘贴后点击 **解析链接**。链接格式为 `https://elrc.shanghaitech.edu.cn/learn/videoreview/课程标识?...`，请完整保留周次、星期、节次等参数。
-5. 在工具新打开的 Chrome 窗口中完成学校统一身份认证；登录成功后自动继续。
-6. 勾选需要的教师近景、教师全景、屏幕等画面，可以多选，默认不勾选。
-7. 选择保存文件夹，点击 **下载所选**。下次会记住这个文件夹。
+安装 [Google Chrome](https://www.google.com/chrome/) 后，按系统启动下载器。
+
+- **macOS**：解压应用包，双击 **ELRC 录像下载器.app**。应用包自带 Python 和依赖。Apple 芯片版适用于 arm64 Mac。从源码启动或打包的方法见下文。
+- **Windows**：解压源码，安装 [Python](https://www.python.org/downloads/windows/) 并保留 Tcl/Tk 支持，启用 Python Launcher 或加入 PATH。双击 **启动.cmd**。首次启动需要联网安装依赖。
+
+1. 从 ELRC 复制具体课次的回放链接，粘贴后点击 **解析链接**。链接格式为 `https://elrc.shanghaitech.edu.cn/learn/videoreview/课程标识?...`，请完整保留周次、星期、节次等参数。
+2. 在工具新打开的 Chrome 窗口中完成学校统一身份认证，登录成功后自动继续。
+3. 勾选需要的教师近景、教师全景、屏幕等画面，可以多选，默认不勾选。
+4. 选择保存文件夹，点击 **下载所选**。下次会记住这个文件夹。
 
 录像保留原始 MP4，不转码；文件名包含课程、日期或周次、画面名称与部分资源编号。下载期间请保留工具打开的 Chrome 窗口。
 
@@ -31,7 +33,7 @@
 
 工具使用专用 Chrome 配置目录，不读取日常 Chrome 的账户。密码在学校登录页面输入，应用代码不采集密码；浏览器会在本地保存 Cookie 等登录状态。
 
-默认状态目录：`%LOCALAPPDATA%\ELRCVideoDownloader`。其中 `chrome-profile` 保存登录状态，`settings.json` 记住保存文件夹，`runtime` 存放启动器安装的依赖。**不要上传或分享状态目录**，也不要在 issue 中粘贴 Cookie、请求头或含令牌的地址。工具不更改代理、VPN 或系统网络设置。
+macOS 的状态目录是 `~/Library/Application Support/ELRCVideoDownloader`，Windows 使用 `%LOCALAPPDATA%\ELRCVideoDownloader`。其中 `chrome-profile` 保存登录状态，`settings.json` 记住保存文件夹。Windows 启动器将依赖安装到 `runtime`。**不要上传或分享状态目录**，也不要在 issue 中粘贴 Cookie、请求头或含令牌的地址。工具不更改代理、VPN 或系统网络设置。
 
 下载文件旁可能出现以下记录：
 
@@ -55,11 +57,30 @@
 
 **Chrome 启动失败？** 安装 Google Chrome，关闭上次由本工具打开的 Chrome 后重试。不要同时运行多个共用配置目录的实例。
 
-**没有合适的 Python？** 安装 Python 3.10+ 并保留 Tcl/Tk；也可通过 `ELRC_PYTHON` 环境变量指定 `python.exe`。启动器优先使用该变量，然后尝试 `py -3` 和 PATH 上的 Python。依赖来自 PyPI；若已安装 uv，启动器会使用它。
+**Windows 启动器找不到 Python？** 安装 Python 3.10+ 并保留 Tcl/Tk。启动器依次尝试 `ELRC_PYTHON` 指定的 `python.exe`、`py -3` 和 PATH 上的 Python。依赖来自 PyPI，启动器会优先使用已安装的 uv。
 
 ## 从源码运行
 
-在仓库目录中执行：
+在仓库目录中执行对应系统的命令。
+
+### macOS
+
+安装带 Tcl/Tk 的 [Python](https://www.python.org/downloads/macos/)。下面的命令也用于准备打包环境。
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python elrc_downloader.py
+```
+
+打包时安装 PyInstaller，再运行 `sh build-macos.sh`。应用会生成在 `dist` 目录。Apple 芯片版使用原生 arm64 Python 打包。
+
+```sh
+.venv/bin/python -m pip install pyinstaller==6.22.3
+sh build-macos.sh
+```
+
+### Windows
 
 ```powershell
 py -3 -m venv .venv
@@ -67,7 +88,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe elrc_downloader.py
 ```
 
-通过 `--state-dir "D:\elrc-state"` 可以指定专用登录及设置目录。
+在任一系统上，可以通过 `--state-dir` 指定专用登录及设置目录。
 
 ## 开发与测试
 
@@ -77,6 +98,8 @@ py -3 -m venv .venv
 ```
 
 测试使用合成数据、本机 HTTP 服务和模拟下载任务，不访问真实课程或读取登录配置。DOM 测试使用本机 Chrome，缺少 Chrome 时跳过；Tk 测试使用临时状态目录和模拟后台任务。GitHub Actions 在 Windows 上运行这些回归测试。
+
+macOS 在同一环境运行 `.venv/bin/python -m pip install -r requirements-dev.txt` 和 `.venv/bin/python -m pytest tests -q`。
 
 原版于 2026-10-08 完成真实 ELRC 单节回放测试：Chrome 登录、三路画面解析、复用登录状态，以及一份约 58 MB 录像的完整下载和结构校验。开源仓库仅包含代码及合成测试数据。学校网站更新后可能需要适配，自动测试不能代替实时平台验证。
 
